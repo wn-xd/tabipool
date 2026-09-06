@@ -105,16 +105,11 @@ try {
 }
 
 # 5. config.local.ps1 and providers.json
-$generatedToken = $null
 $configFile = Join-Path $installDir "config.local.ps1"
 $exampleConfig = Join-Path $installDir "config.local.ps1.example"
 if (-not (Test-Path $configFile) -and (Test-Path $exampleConfig)) {
   Copy-Item $exampleConfig $configFile
-  $generatedToken = [guid]::NewGuid().ToString()
-  $content = Get-Content $configFile -Raw
-  $content = $content -replace 'change-me-to-a-long-random-string', $generatedToken
-  Set-Content $configFile $content -Encoding UTF8
-  Write-Host "Generated new PROXY_TOKEN in config.local.ps1" -ForegroundColor Green
+  Write-Host "Initialized config.local.ps1 from example" -ForegroundColor Green
 }
 
 $providersFile = Join-Path $installDir "providers.json"
@@ -151,9 +146,6 @@ Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "  tabipool installation complete!" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green
-if ($generatedToken) {
-  Write-Host "  PROXY_TOKEN: $generatedToken" -ForegroundColor Yellow
-}
 Write-Host "  Dashboard:   http://127.0.0.1:8787/" -ForegroundColor Cyan
 Write-Host "  CLI:         tabipool" -ForegroundColor Cyan
 Write-Host ""

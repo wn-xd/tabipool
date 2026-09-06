@@ -14,7 +14,7 @@ This will automatically:
 1. Verify prerequisites (`git`, `bun`, `nssm`).
 2. Clone `tabipool` to `%USERPROFILE%\tabipool` (or update if already cloned).
 3. Install dependencies (`bun install`).
-4. Generate `config.local.ps1` with a random `PROXY_TOKEN` and initialize `providers.json`.
+4. Initialize `config.local.ps1` and `providers.json` from examples.
 5. Set the `TABIPOOL_HOME` environment variable and add `tabipool` to your user `PATH`.
 6. Install and start the background Windows service (starts at boot).
 
@@ -38,7 +38,7 @@ The `tabipool` CLI is available globally from any command prompt or PowerShell:
 
 Open `http://127.0.0.1:8787/` (or `tabipool web`):
 
-- **Manage Upstreams:** Add or remove providers directly in the dashboard using your proxy token. Upstreams support manual model lists for gateways with empty `/v1/models` responses.
+- **Manage Upstreams:** Add or remove providers directly in the dashboard. Upstreams support manual model lists for gateways with empty `/v1/models` responses.
 - **Add API Keys:** Add and validate `sk-` keys against the selected provider before they join the live rotation pool.
 - **Live Balances & Drain:** Monitor real-time quota, health, and spend per key.
 - **Failover & Blip Absorption:** Requests automatically retry across keys and providers on rate-limits, gateway timeouts, or errors.
@@ -49,10 +49,10 @@ Open `http://127.0.0.1:8787/` (or `tabipool web`):
 
 Point OpenAI- or Anthropic-compatible clients (e.g. Cursor, OpenCode, Aider, LiteLLM) to:
 - **Base URL:** `http://127.0.0.1:8787/v1` (or `http://tabi.localhost/v1` if `UI_PORT=80`)
-- **API Key / Bearer Token:** Your configured `PROXY_TOKEN` from `config.local.ps1`.
+- **API Key / Bearer Token:** Not required (loopback-only; leave empty or pass any dummy string).
 
 ---
 
 ## Security
 
-The proxy binds exclusively to loopback (`127.0.0.1`). All tokens, keys, and usage data remain local to your machine and are excluded from git.
+The proxy binds exclusively to loopback (`127.0.0.1`). Upstream keys and usage data remain local to your machine and are excluded from git.

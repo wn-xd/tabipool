@@ -152,15 +152,13 @@
           <div class="label">Add API keys</div>
           <div class="note" style="margin:0 0 9px">
             One <code>sk-</code> key per line, validated against the selected provider before it joins
-            the pool, then appended to that provider's key file. Requires the proxy token.
+            the pool, then appended to that provider's key file.
           </div>
           <textarea id="newkeys" rows="3" placeholder="sk-..." spellcheck="false"
             style="width:100%;background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:9px;font-family:var(--mono);font-size:12px;resize:vertical"></textarea>
           <div style="display:flex;gap:9px;align-items:center;margin-top:9px;flex-wrap:wrap">
             <select id="provsel" title="which provider these keys belong to"
               style="background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px"></select>
-            <input id="tok" type="password" placeholder="proxy token" autocomplete="off"
-              style="background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px;width:190px" />
             <button id="addbtn">add keys</button>
             <span class="note" id="addmsg" style="margin:0"></span>
           </div>
@@ -168,7 +166,7 @@
         <div class="card" style="margin-bottom:14px">
           <div class="label">Add upstream</div>
           <div class="note" style="margin:0 0 9px">
-            Register an upstream provider. Models can be specified (comma- or space-separated) for gateways that return an empty <code>/v1/models</code>. Requires the proxy token.
+            Register an upstream provider. Models can be specified (comma- or space-separated) for gateways that return an empty <code>/v1/models</code>.
           </div>
           <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
             <input id="provname" type="text" placeholder="name (e.g. provider2)" autocomplete="off"
@@ -177,8 +175,6 @@
               style="background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px;flex:1;min-width:200px" />
             <input id="provmodels" type="text" placeholder="models (optional: claude-..., ...)" autocomplete="off"
               style="background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px;flex:1;min-width:200px" />
-            <input id="provtok" type="password" placeholder="proxy token" autocomplete="off"
-              style="background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px;width:170px" />
             <button id="addprovbtn">add upstream</button>
             <span class="note" id="addprovmsg" style="margin:0"></span>
           </div>
@@ -482,14 +478,11 @@
             btn.onclick = async () => {
               const name = btn.dataset.name;
               if (!confirm(`Remove provider "${name}" and drop its keys from the pool?`)) return;
-              const token = ($("provtok")?.value || $("tok")?.value || sessionStorage.getItem("proxyToken") || prompt("proxy token:"))?.trim();
-              if (!token) { alert("proxy token required"); return; }
-              sessionStorage.setItem("proxyToken", token);
               btn.disabled = true;
               try {
                 const r = await fetch("/_providers/remove", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ name }),
                 });
                 const j = await r.json();
@@ -579,37 +572,17 @@
       );
       $("refresh").addEventListener("click", load);
 
-      // Token is kept in sessionStorage only: convenience across refreshes without
-      // persisting a spending credential to disk.
-      const savedTok = sessionStorage.getItem("proxyToken") || "";
-      $("tok").value = savedTok;
-      if ($("provtok")) $("provtok").value = savedTok;
-
-      $("tok").addEventListener("input", () => {
-        sessionStorage.setItem("proxyToken", $("tok").value);
-        if ($("provtok")) $("provtok").value = $("tok").value;
-      });
-      if ($("provtok")) {
-        $("provtok").addEventListener("input", () => {
-          sessionStorage.setItem("proxyToken", $("provtok").value);
-          $("tok").value = $("provtok").value;
-        });
-      }
-
       $("addbtn").addEventListener("click", async () => {
         const raw = $("newkeys").value.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
-        const token = $("tok").value.trim();
         const msg = $("addmsg");
         if (!raw.length) { msg.textContent = "paste at least one key"; return; }
-        if (!token) { msg.textContent = "proxy token required"; return; }
-        sessionStorage.setItem("proxyToken", token);
         $("addbtn").disabled = true;
         const prov = $("provsel").value;
         msg.textContent = `validating ${raw.length} key(s) against ${prov || "the gateway"}…`;
         try {
           const r = await fetch("/_keys/add", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(prov ? { keys: raw, provider: prov } : { keys: raw }),
           });
           const j = await r.json();
@@ -635,16 +608,10 @@
           const name = $("provname").value.trim();
           const upstream = $("provurl").value.trim();
           const modelsRaw = $("provmodels").value.trim();
-          const token = ($("provtok")?.value || $("tok")?.value || sessionStorage.getItem("proxyToken") || "").trim();
           const msg = $("addprovmsg");
 
           if (!name) { msg.innerHTML = `<span style="color:var(--bad)">name required</span>`; return; }
           if (!upstream) { msg.innerHTML = `<span style="color:var(--bad)">upstream URL required</span>`; return; }
-          if (!token) { msg.innerHTML = `<span style="color:var(--bad)">proxy token required</span>`; return; }
-
-          sessionStorage.setItem("proxyToken", token);
-          if ($("provtok")) $("provtok").value = token;
-          $("tok").value = token;
 
           $("addprovbtn").disabled = true;
           msg.textContent = `adding upstream ${name}…`;
@@ -654,7 +621,7 @@
           try {
             const r = await fetch("/_providers/add", {
               method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ name, upstream, models }),
             });
             const j = await r.json();
@@ -676,11 +643,9 @@
       }
 
       async function doUpdate() {
-        const token = sessionStorage.getItem("proxyToken") || prompt("proxy token:");
-        if (!token) return;
         const b = $("updbtn"); b.disabled = true; b.textContent = "updating… service will restart";
         try {
-          await fetch("/_update", { method: "POST", headers: { Authorization: "Bearer " + token } });
+          await fetch("/_update", { method: "POST" });
         } catch {}
         // The service restarts under it; poll until the new version answers.
         setTimeout(() => location.reload(), 8000);

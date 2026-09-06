@@ -94,17 +94,13 @@ Invoke-Nssm set $svc Start SERVICE_AUTO_START
 # Config travels with the service, not with a shell or a user profile.
 $configFile = Join-Path $dir "config.local.ps1"
 if (-not (Test-Path $configFile)) {
-  throw "config.local.ps1 not found. Copy config.local.ps1.example to config.local.ps1 and set PROXY_TOKEN before installing. Refusing to install an open proxy with a default token."
+  throw "config.local.ps1 not found. Copy config.local.ps1.example to config.local.ps1 before installing."
 }
 . $configFile
-if (-not $PROXY_TOKEN -or $PROXY_TOKEN -eq "change-me-to-a-long-random-string") {
-  throw "PROXY_TOKEN in config.local.ps1 is empty or still the placeholder. Set a real random token."
-}
 $envBlock = @(
   "PORT=$PORT",
   "UI_PORT=$UI_PORT",
   "HOST=$HOST_ADDR",
-  "PROXY_TOKEN=$PROXY_TOKEN",
   "STATE_FILE=state.json",
   "LOG_FILE=requests.jsonl"
 ) -join "`r`n"

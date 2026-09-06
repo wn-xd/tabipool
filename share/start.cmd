@@ -8,7 +8,7 @@ set LOG=%DIR%proxy.log
 if not exist "%DIR%config.cmd" (
   echo.
   echo   ERROR: config.cmd not found.
-  echo   Copy config.cmd.example to config.cmd and set PROXY_TOKEN + UPSTREAM.
+  echo   Copy config.cmd.example to config.cmd and set UPSTREAM.
   echo.
   pause
   exit /b 1

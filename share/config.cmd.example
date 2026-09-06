@@ -4,10 +4,6 @@ rem  Copy this file to  config.cmd  and edit the values below.
 rem  config.cmd holds your secrets and is gitignored.
 rem ============================================================
 
-rem --- REQUIRED: a password of your choosing that clients must send. ---
-rem The proxy attaches your real API keys for you, so anything that can reach
-rem this port can spend your credit. Pick something non-obvious.
-set PROXY_TOKEN=change-me-to-something-random
 
 rem --- REQUIRED: which gateway to route to. ---
 rem Any new-api / one-api style OpenAI-compatible gateway works.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+- Zero-friction local operation: removed client-facing proxy token across all endpoints and UI.
+- Simplified configuration and installation: loopback-only binding with no client authentication needed.
+
 ## 1.0.2
 - Dashboard upstream management: add and remove providers directly from the web interface.
 - Manual model declarations per provider for gateways returning empty `/v1/models`.

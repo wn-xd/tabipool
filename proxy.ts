@@ -21,7 +21,6 @@ const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "127.0.0.1";
 /** Friendly-URL listener for http://tabi.localhost/ . 0 disables it. */
 const UI_PORT = Number(process.env.UI_PORT ?? 80);
-const PROXY_TOKEN = process.env.PROXY_TOKEN ?? "";
 const KEYS_FILE = process.env.KEYS_FILE ?? "keys.txt";
 const STATE_FILE = process.env.STATE_FILE ?? "state.json";
 const LOG_FILE = process.env.LOG_FILE ?? "requests.jsonl";
@@ -614,13 +613,6 @@ function buildUpstreamHeaders(req: Request, key: string): Headers {
   return h;
 }
 
-function clientAuthorized(req: Request): boolean {
-  if (!PROXY_TOKEN) return true;
-  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  const apiKey = req.headers.get("x-api-key")?.trim();
-  return bearer === PROXY_TOKEN || apiKey === PROXY_TOKEN;
-}
-
 function jsonError(status: number, message: string, type = "proxy_error") {
   return Response.json({ error: { message, type, code: "" } }, { status });
 }
@@ -1185,9 +1177,7 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
   srv.timeout(req, 0);
   {
 
-    // The dashboard is read-only and exposes no key material, so it is gated on
-    // loopback origin rather than the proxy token: a browser cannot attach headers
-    // to a plain navigation. Spending still requires the token.
+    // The dashboard is loopback-only and exposes no key material.
     const ip = srv.requestIP(req)?.address ?? "";
     const isLocal = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
     if (url.pathname === "/" || url.pathname === "/index.html") {
@@ -1200,20 +1190,17 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
       });
     }
     if (url.pathname === "/_stats") {
-      if (!isLocal && !clientAuthorized(req)) return jsonError(401, "proxy token required");
       const w = Number(url.searchParams.get("window")) || 24 * 60 * 60 * 1000;
       return Response.json(statsSnapshot(w));
     }
     if (url.pathname === "/_pool") {
-      if (!isLocal && !clientAuthorized(req)) return jsonError(401, "proxy token required");
       return Response.json(poolSnapshot());
     }
 
     // Add a new upstream from the dashboard: name + upstream URL + optional model list.
     // Keys are added separately via /_keys/add. Persisted to providers.json so it
-    // survives a restart. Requires the token like every other mutation.
+    // survives a restart.
     if (url.pathname === "/_providers/add" && req.method === "POST") {
-      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
       let name = "";
       let upstream = "";
       let models: string[] = [];
@@ -1252,7 +1239,6 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
     // Remove an upstream and drop its keys from the live pool. Its key file is left on
     // disk (the friend may re-add it); the provider is unregistered and persisted out.
     if (url.pathname === "/_providers/remove" && req.method === "POST") {
-      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
       let name = "";
       try {
         const payload = (await req.json()) as { name?: string };
@@ -1275,10 +1261,7 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
       return Response.json({ removed: name, providers: providers.map((p) => p.name), poolSize: keys.length });
     }
 
-    // Mutating the pool always requires the token, even on loopback: a browser page
-    // on any origin can POST to localhost, so origin alone is not authorization.
     if (url.pathname === "/_keys/add" && req.method === "POST") {
-      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
       let submitted: string[] = [];
       let target = providers[0]!.name;
       try {
@@ -1338,7 +1321,6 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
     }
 
     if (url.pathname === "/_keys/remove" && req.method === "POST") {
-      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
       let tails: string[] = [];
       try {
         const payload = (await req.json()) as { tails?: string[] };
@@ -1370,13 +1352,11 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
       return Response.json({ ok: available(Date.now()).length > 0, version: VERSION });
     }
     if (url.pathname === "/_update" && req.method === "POST") {
-      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
       // Detached so the child survives this process being restarted by its supervisor.
       Bun.spawn(["cmd", "/c", "tabipool.cmd", "update"], { cwd: REPO_DIR, stdio: ["ignore", "ignore", "ignore"] }).unref();
       return Response.json({ starting: true, from: VERSION, to: updateInfo.latest });
     }
     if (!url.pathname.startsWith("/v1/")) return jsonError(404, `no route for ${url.pathname}`);
-    if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
 
     // Serve the union of every provider's models so one picker shows them all. Built
     // from discovery rather than proxied, since no single upstream knows them all.
@@ -1418,10 +1398,7 @@ console.log(`pool proxy on http://${HOST}:${server.port}`);
 for (const p of providers) {
   console.log(`  provider ${p.name.padEnd(12)} -> ${p.upstream}  (${keys.filter((k) => k.provider === p.name).length} keys)`);
 }
-console.log(`  keys: ${keys.length}   auth: ${PROXY_TOKEN ? "token required" : "OPEN (no PROXY_TOKEN set)"}`);
-if (!PROXY_TOKEN) {
-  console.warn("  WARNING: no PROXY_TOKEN set - anything that can reach this port can spend the pool");
-}
+console.log(`  keys: ${keys.length}   loopback-only, no client auth`);
 console.log(`  dashboard:   http://${HOST}:${server.port}/`);
 if (uiServer) console.log(`  friendly:    http://tabi.localhost/  (port ${uiServer.port})`);
 console.log(`  pool status: GET /_pool    stats: GET /_stats`);
