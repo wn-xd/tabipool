@@ -131,6 +131,12 @@ type Provider = {
   enabled: boolean;
   /** Model ids this provider serves, learned from its own /v1/models. */
   models: Set<string>;
+  /**
+   * Model ids declared by config/UI. Some gateways answer chat requests but return an
+   * empty /v1/models, so discovery alone finds nothing; these are merged in unconditionally
+   * and let a request route even when the upstream will not enumerate its own models.
+   */
+  manualModels: string[];
   lastError: string | null;
 };
 
@@ -289,31 +295,29 @@ async function loadProviders() {
   if (await f.exists()) {
     try {
       const cfg = JSON.parse(await f.text()) as {
-        providers?: { name?: string; upstream?: string; keysFile?: string; enabled?: boolean }[];
+        providers?: { name?: string; upstream?: string; keysFile?: string; enabled?: boolean; models?: string[] }[];
       };
       for (const p of cfg.providers ?? []) {
         if (!p.name || !p.upstream || !p.keysFile) continue;
         if (p.enabled === false) continue;
+        // A provider may exist before it has keys: added via the UI, keys pasted after.
+        // Load it anyway so it shows in the dashboard and can receive keys, rather than
+        // silently vanishing on the next restart.
         const kf = Bun.file(p.keysFile);
-        if (!(await kf.exists())) {
-          console.warn(`[provider] ${p.name}: ${p.keysFile} missing, skipped`);
-          continue;
-        }
-        const raw = (await kf.text()).split("\n").map((s) => s.trim()).filter((s) => s && !s.startsWith("#"));
-        if (!raw.length) {
-          console.warn(`[provider] ${p.name}: no keys in ${p.keysFile}, skipped`);
-          continue;
-        }
+        const raw = (await kf.exists())
+          ? (await kf.text()).split("\n").map((s) => s.trim()).filter((s) => s && !s.startsWith("#"))
+          : [];
         providers.push({
           name: p.name,
           upstream: p.upstream.replace(/\/+$/, ""),
           keysFile: p.keysFile,
           enabled: true,
           models: new Set(),
+          manualModels: (p.models ?? []).map((m) => String(m).trim()).filter(Boolean),
           lastError: null,
         });
         const n = addKeys(raw, credits, p.name).length;
-        console.log(`[provider] ${p.name} -> ${p.upstream} (${n} keys)`);
+        console.log(`[provider] ${p.name} -> ${p.upstream} (${n} keys${p.models?.length ? `, ${p.models.length} declared models` : ""})`);
       }
     } catch (e) {
       console.warn(`${PROVIDERS_FILE} unreadable: ${(e as Error).message}`);
@@ -333,6 +337,7 @@ async function loadProviders() {
       keysFile: KEYS_FILE,
       enabled: true,
       models: new Set(),
+      manualModels: [],
       lastError: null,
     });
     addKeys(raw, credits, "default");
@@ -359,6 +364,32 @@ async function rewriteKeysFiles() {
     const own = keys.filter((k) => k.provider === p.name).map((k) => k.key);
     await Bun.write(p.keysFile, own.length ? own.join("\n") + "\n" : "");
   }
+}
+
+/**
+ * Rewrites providers.json from the live provider set, so upstreams added or removed via
+ * the UI survive a restart. The `_comment` field is preserved if the file already had one.
+ */
+async function saveProviders() {
+  const f = Bun.file(PROVIDERS_FILE);
+  let comment: string | undefined;
+  if (await f.exists()) {
+    try {
+      const prior = JSON.parse(await f.text()) as { _comment?: string };
+      comment = prior._comment;
+    } catch { /* unreadable prior file: write without a comment */ }
+  }
+  const out = {
+    ...(comment ? { _comment: comment } : {}),
+    providers: providers.map((p) => ({
+      name: p.name,
+      upstream: p.upstream,
+      keysFile: p.keysFile,
+      enabled: p.enabled,
+      ...(p.manualModels.length ? { models: p.manualModels } : {}),
+    })),
+  };
+  await Bun.write(PROVIDERS_FILE, JSON.stringify(out, null, 2) + "\n");
 }
 
 /**
@@ -622,9 +653,10 @@ async function discoverModels() {
       const j = (await r.json()) as { data?: { id?: string }[] };
       const ids = (j.data ?? []).map((m) => m.id).filter((x): x is string => !!x);
       // An empty list is a real answer (upstream has no channel), so it replaces the
-      // set; a failed probe above does not.
+      // set; a failed probe above does not. Manual models cover gateways that serve
+      // chat but return an empty /v1/models.
       p.models = new Set(ids);
-      p.lastError = ids.length ? null : "no models served";
+      p.lastError = ids.length || p.manualModels.length ? null : "no models served";
     } catch (e) {
       p.lastError = (e as Error).message.slice(0, 80);
     }
@@ -633,6 +665,7 @@ async function discoverModels() {
   modelOwner.clear();
   for (const p of providers) {
     for (const id of p.models) if (!modelOwner.has(id)) modelOwner.set(id, p.name);
+    for (const id of p.manualModels) if (!modelOwner.has(id)) modelOwner.set(id, p.name);
   }
 
   const summary = providers
@@ -1000,10 +1033,12 @@ function poolSnapshot() {
     upstream: providers.map((p) => p.upstream).join(", "),
     providers: providers.map((p) => {
       const own = keys.filter((k) => k.provider === p.name);
+      const allModels = Array.from(new Set([...p.models, ...p.manualModels]));
       return {
         name: p.name,
         upstream: p.upstream,
-        models: p.models.size,
+        models: allModels.length,
+        modelList: allModels,
         keys: own.length,
         live: own.filter((k) => !k.dead && k.coolUntil <= now).length,
         remainingUsd: +(
@@ -1174,6 +1209,72 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
       return Response.json(poolSnapshot());
     }
 
+    // Add a new upstream from the dashboard: name + upstream URL + optional model list.
+    // Keys are added separately via /_keys/add. Persisted to providers.json so it
+    // survives a restart. Requires the token like every other mutation.
+    if (url.pathname === "/_providers/add" && req.method === "POST") {
+      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
+      let name = "";
+      let upstream = "";
+      let models: string[] = [];
+      try {
+        const payload = (await req.json()) as { name?: string; upstream?: string; models?: string[] | string };
+        name = String(payload.name ?? "").trim();
+        upstream = String(payload.upstream ?? "").trim().replace(/\/+$/, "");
+        const rawModels = Array.isArray(payload.models) ? payload.models : String(payload.models ?? "").split(/[\s,]+/);
+        models = rawModels.map((m) => String(m).trim()).filter(Boolean);
+      } catch {
+        return jsonError(400, "body must be JSON: {\"name\": \"...\", \"upstream\": \"https://...\", \"models\": [\"claude-...\"]}");
+      }
+      if (!name || !/^[A-Za-z0-9_-]{1,32}$/.test(name)) {
+        return jsonError(400, "name must be 1-32 chars of [A-Za-z0-9_-]");
+      }
+      if (!/^https?:\/\/[^\s]+$/.test(upstream)) {
+        return jsonError(400, "upstream must be an http(s) URL");
+      }
+      if (providerByName(name)) return jsonError(400, `provider "${name}" already exists`);
+      const keysFile = `keys-${name}.txt`;
+      providers.push({
+        name,
+        upstream,
+        keysFile,
+        enabled: true,
+        models: new Set(),
+        manualModels: models,
+        lastError: keys.some((k) => k.provider === name) ? null : "no keys yet",
+      });
+      await saveProviders();
+      await discoverModels();
+      console.log(`[provider] added ${name} -> ${upstream} (${models.length} declared models)`);
+      return Response.json({ added: name, upstream, models, keysFile });
+    }
+
+    // Remove an upstream and drop its keys from the live pool. Its key file is left on
+    // disk (the friend may re-add it); the provider is unregistered and persisted out.
+    if (url.pathname === "/_providers/remove" && req.method === "POST") {
+      if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
+      let name = "";
+      try {
+        const payload = (await req.json()) as { name?: string };
+        name = String(payload.name ?? "").trim();
+      } catch {
+        return jsonError(400, "body must be JSON: {\"name\": \"...\"}");
+      }
+      const prov = providerByName(name);
+      if (!prov) return jsonError(400, `unknown provider "${name}"`);
+      if (providers.length <= 1) return jsonError(400, "refusing to remove the last provider");
+      // Drop this provider's keys from the pool, then resequence ids (they index the array).
+      for (let i = keys.length - 1; i >= 0; i--) if (keys[i]!.provider === name) keys.splice(i, 1);
+      keys.forEach((k, i) => (k.id = i));
+      const idx = providers.findIndex((p) => p.name === name);
+      providers.splice(idx, 1);
+      await saveProviders();
+      await discoverModels();
+      saveState();
+      console.log(`[provider] removed ${name}`);
+      return Response.json({ removed: name, providers: providers.map((p) => p.name), poolSize: keys.length });
+    }
+
     // Mutating the pool always requires the token, even on loopback: a browser page
     // on any origin can POST to localhost, so origin alone is not authorization.
     if (url.pathname === "/_keys/add" && req.method === "POST") {
@@ -1271,7 +1372,7 @@ async function handleRequest(req: Request, srv: Bun.Server<undefined>): Promise<
     if (url.pathname === "/_update" && req.method === "POST") {
       if (!clientAuthorized(req)) return jsonError(401, "proxy token required");
       // Detached so the child survives this process being restarted by its supervisor.
-      Bun.spawn(["cmd", "/c", "update.cmd"], { cwd: REPO_DIR, stdio: ["ignore", "ignore", "ignore"] }).unref();
+      Bun.spawn(["cmd", "/c", "tabipool.cmd", "update"], { cwd: REPO_DIR, stdio: ["ignore", "ignore", "ignore"] }).unref();
       return Response.json({ starting: true, from: VERSION, to: updateInfo.latest });
     }
     if (!url.pathname.startsWith("/v1/")) return jsonError(404, `no route for ${url.pathname}`);

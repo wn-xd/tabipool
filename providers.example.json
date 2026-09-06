@@ -1,6 +1,6 @@
 {
-  "_comment": "Multi-provider routing. Copy to providers.json (gitignored) and list your own providers. Each has its own upstream and key file (keys*.txt, gitignored). Provider names are not secret but this is per-person config, kept out of the update path.",
+  "_comment": "Copy to providers.json. Each provider: own upstream + keysFile (keys-<name>.txt). 'models' lists the model ids this upstream serves, for gateways that return an empty /v1/models. Manage these from the dashboard instead of editing by hand.",
   "providers": [
-    { "name": "example", "upstream": "https://api.example.com", "keysFile": "keys.txt", "enabled": true }
+    { "name": "example", "upstream": "https://api.example.com", "keysFile": "keys.txt", "enabled": true, "models": ["claude-opus-5", "claude-sonnet-4"] }
   ]
 }

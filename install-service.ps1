@@ -30,9 +30,11 @@ function Invoke-Nssm {
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
   [Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-  Write-Host "ERROR: must run as Administrator to create a Windows service." -ForegroundColor Red
-  Write-Host "  Double-click install-service.cmd, or run this from an elevated PowerShell."
-  exit 1
+  Write-Host "Elevating to Administrator to configure the Windows service..."
+  $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$($MyInvocation.MyCommand.Path)`"")
+  if ($Uninstall) { $argList += "-Uninstall" }
+  $proc = Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -PassThru -Wait
+  exit $proc.ExitCode
 }
 
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -47,6 +49,11 @@ if (-not $nssm) { throw "nssm.exe not found. Install with: winget install NSSM.N
 Write-Host "using nssm: $nssm"
 
 if ($Uninstall) {
+  $uninstallScript = Join-Path $dir "uninstall.ps1"
+  if (Test-Path $uninstallScript) {
+    & $uninstallScript
+    exit $LASTEXITCODE
+  }
   Invoke-Nssm stop $svc
   Invoke-Nssm remove $svc confirm
   Write-Host "service '$svc' removed"

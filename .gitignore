@@ -22,7 +22,6 @@ service-*.log
 probe/
 
 node_modules/
-tabipool.cmd
 _retired-wrappers/
 share.zip
 
