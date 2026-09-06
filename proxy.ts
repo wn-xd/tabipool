@@ -326,26 +326,25 @@ async function loadProviders() {
   if (!providers.length) {
     const kf = Bun.file(KEYS_FILE);
     if (!(await kf.exists())) {
-      console.error(`fatal: no providers configured and ${KEYS_FILE} not found`);
-      process.exit(1);
+      console.warn(`[pool] no providers configured and ${KEYS_FILE} not found; starting with empty pool`);
+    } else {
+      const raw = (await kf.text()).split("\n").map((s) => s.trim()).filter((s) => s && !s.startsWith("#"));
+      providers.push({
+        name: "default",
+        upstream: UPSTREAM.replace(/\/+$/, ""),
+        keysFile: KEYS_FILE,
+        enabled: true,
+        models: new Set(),
+        manualModels: [],
+        lastError: null,
+      });
+      addKeys(raw, credits, "default");
+      console.log(`[provider] default -> ${UPSTREAM} (${keys.length} keys)`);
     }
-    const raw = (await kf.text()).split("\n").map((s) => s.trim()).filter((s) => s && !s.startsWith("#"));
-    providers.push({
-      name: "default",
-      upstream: UPSTREAM.replace(/\/+$/, ""),
-      keysFile: KEYS_FILE,
-      enabled: true,
-      models: new Set(),
-      manualModels: [],
-      lastError: null,
-    });
-    addKeys(raw, credits, "default");
-    console.log(`[provider] default -> ${UPSTREAM} (${keys.length} keys)`);
   }
 
   if (!keys.length) {
-    console.error("fatal: no keys loaded from any provider");
-    process.exit(1);
+    console.warn("[pool] no keys loaded yet - add keys via the dashboard or keys files, then they activate live");
   }
 }
 

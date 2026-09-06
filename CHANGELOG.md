@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.6
+- Resilient startup with empty pool: replaced fatal process exits on missing keys/providers in `loadProviders()` with non-fatal warnings, ensuring the proxy and dashboard always boot so keys and providers can be configured via the web UI.
+
 ## 1.0.5
 - Fix UTF-8 BOM issue in `register-agents.ps1`: write agent configuration files (opencode, Prime Agent, Continue) in BOM-less UTF-8 via `[System.IO.File]::WriteAllText`, resolving `JSON.parse` syntax errors in Node and JS environments. Added defensive BOM stripping on read.
 
