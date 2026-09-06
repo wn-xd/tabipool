@@ -7,7 +7,7 @@ Key-rotating reverse proxy pool for OpenAI-compatible gateways with automatic fa
 Run in PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/wn-xd/tabipool/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/windro-exe/tabipool/main/install.ps1 | iex
 ```
 
 This will automatically:

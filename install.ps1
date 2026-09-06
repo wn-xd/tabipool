@@ -1,5 +1,5 @@
 # tabipool one-line installer
-# Usage: irm https://raw.githubusercontent.com/wn-xd/tabipool/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/windro-exe/tabipool/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -92,7 +92,7 @@ if (Test-Path "$installDir\.git") {
   }
 } else {
   Write-Host "Cloning tabipool into $installDir..." -ForegroundColor Cyan
-  & git clone https://github.com/wn-xd/tabipool.git $installDir
+  & git clone https://github.com/windro-exe/tabipool.git $installDir
 }
 
 # 4. bun install
