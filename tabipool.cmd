@@ -49,7 +49,8 @@ if %errorlevel% neq 0 (
 )
 cd /d "%TABIPOOL_DIR%"
 for /f %%h in ('git rev-parse HEAD:bun.lock 2^>nul') do set OLDLOCK=%%h
-git pull
+git fetch origin
+git reset --hard origin/main
 for /f %%h in ('git rev-parse HEAD:bun.lock 2^>nul') do set NEWLOCK=%%h
 if not "%OLDLOCK%"=="%NEWLOCK%" call bun install
 nssm restart tabipool

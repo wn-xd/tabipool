@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.7
+- Reliable update flow on Windows: added `.gitattributes` to normalize line endings (LF for general files, CRLF for Windows scripts) and prevent phantom modifications.
+- Replaced bare `git pull` in `tabipool.cmd` update and `install.ps1` with `git fetch origin` followed by `git reset --hard origin/main` to guarantee clean updates without merge conflicts.
+
 ## 1.0.6
 - Resilient startup with empty pool: replaced fatal process exits on missing keys/providers in `loadProviders()` with non-fatal warnings, ensuring the proxy and dashboard always boot so keys and providers can be configured via the web UI.
 

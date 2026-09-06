@@ -83,10 +83,11 @@ if ($nssm) {
 # 2 & 3. Choose install dir and clone or pull
 $installDir = "$env:USERPROFILE\tabipool"
 if (Test-Path "$installDir\.git") {
-  Write-Host "Existing installation found at $installDir. Pulling latest..." -ForegroundColor Yellow
+  Write-Host "Existing installation found at $installDir. Syncing to latest..." -ForegroundColor Yellow
   Push-Location $installDir
   try {
-    & git pull
+    & git fetch origin
+    & git reset --hard origin/main
   } finally {
     Pop-Location
   }
