@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.5
+- Fix UTF-8 BOM issue in `register-agents.ps1`: write agent configuration files (opencode, Prime Agent, Continue) in BOM-less UTF-8 via `[System.IO.File]::WriteAllText`, resolving `JSON.parse` syntax errors in Node and JS environments. Added defensive BOM stripping on read.
+
 ## 1.0.4
 - Agent auto-registration (`tabipool register` + `register-agents.ps1`): automatically detect and configure opencode, Prime Agent, and Continue with live models fetched from `/v1/models`.
 - Manual configuration snippets: printed instructions for Aider, Cline, omp, and generic OpenAI-compatible clients.

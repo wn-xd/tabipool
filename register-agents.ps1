@@ -11,6 +11,8 @@ if (-not $UserHome) {
   $UserHome = $env:USERPROFILE
 }
 
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
 # 1. Determine base URL
 if (-not $Port) {
   $localConfig = Join-Path $PSScriptRoot "config.local.ps1"
@@ -87,6 +89,7 @@ if ($opencodeDetected) {
     if (Test-Path $opencodeFile) {
       $rawJson = Get-Content -Path $opencodeFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
       if ($rawJson -and $rawJson.Trim()) {
+        $rawJson = $rawJson -replace '^\uFEFF', ''
         $json = $rawJson | ConvertFrom-Json -ErrorAction SilentlyContinue
       }
     }
@@ -112,7 +115,8 @@ if ($opencodeDetected) {
     }
     Add-Member -InputObject $json.provider -NotePropertyName "tabipool" -NotePropertyValue $tabipoolEntry -Force
 
-    $json | ConvertTo-Json -Depth 10 | Set-Content -Path $opencodeFile -Encoding UTF8
+    $outOpencode = $json | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($opencodeFile, $outOpencode, $utf8NoBom)
     $agentSummary += "  [UPDATED] opencode     ($opencodeFile)"
   } catch {
     $agentSummary += "  [FAILED]  opencode     ($_)"
@@ -136,6 +140,7 @@ if ($primeDetected) {
     if (Test-Path $primeFile) {
       $rawPrime = Get-Content -Path $primeFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
       if ($rawPrime -and $rawPrime.Trim()) {
+        $rawPrime = $rawPrime -replace '^\uFEFF', ''
         $pjson = $rawPrime | ConvertFrom-Json -ErrorAction SilentlyContinue
       }
     }
@@ -186,7 +191,8 @@ if ($primeDetected) {
       Add-Member -InputObject $pjson.providers -NotePropertyName "tabipool" -NotePropertyValue $primeEntry -Force
     }
 
-    $pjson | ConvertTo-Json -Depth 10 | Set-Content -Path $primeFile -Encoding UTF8
+    $outPrime = $pjson | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($primeFile, $outPrime, $utf8NoBom)
     $agentSummary += "  [UPDATED] Prime Agent  ($primeFile)"
   } catch {
     $agentSummary += "  [FAILED]  Prime Agent  ($_)"
@@ -219,6 +225,7 @@ if ($continueDetected) {
 
     if (Test-Path $continueFile) {
       $content = Get-Content -Path $continueFile -Raw -Encoding UTF8
+      $content = $content -replace '^\uFEFF', ''
       # Remove any prior tabipool fence block
       $content = [regex]::Replace($content, "(?s)\r?\n?\s*# tabipool-begin.*?# tabipool-end", "")
       if ($content -match "(?m)^models:\s*$") {
@@ -226,10 +233,10 @@ if ($continueDetected) {
       } else {
         $newContent = $content.TrimEnd() + "`r`n`r`nmodels:`r`n$fenceText`r`n"
       }
-      Set-Content -Path $continueFile -Value $newContent -Encoding UTF8
+      [System.IO.File]::WriteAllText($continueFile, $newContent, $utf8NoBom)
     } else {
       $newContent = "models:`r`n$fenceText`r`n"
-      Set-Content -Path $continueFile -Value $newContent -Encoding UTF8
+      [System.IO.File]::WriteAllText($continueFile, $newContent, $utf8NoBom)
     }
     $agentSummary += "  [UPDATED] Continue     ($continueFile)"
   } catch {
