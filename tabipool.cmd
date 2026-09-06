@@ -14,6 +14,7 @@ if /i "%~1"=="help" goto help
 if /i "%~1"=="-h" goto help
 if /i "%~1"=="--help" goto help
 if /i "%~1"=="web" goto web
+if /i "%~1"=="register" goto register
 if /i "%~1"=="update" goto update
 if /i "%~1"=="start" goto start
 if /i "%~1"=="stop" goto stop
@@ -100,6 +101,10 @@ echo Stats summary:
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$raw = curl.exe -s http://127.0.0.1:8787/_stats; if ($raw) { $s = $raw | ConvertFrom-Json; Write-Host ('  Uptime:    ' + [math]::Round($s.uptimeMs/60000) + ' min'); Write-Host ('  Pool:      ' + $s.pool.live + '/' + $s.pool.total + ' live keys ($' + $s.money.remainingUsd + ' remaining across pool)'); Write-Host ('  Traffic:   ' + $s.traffic.requests + ' reqs, ' + $s.traffic.successPct + '%% success (p50: ' + $s.traffic.p50Ms + 'ms, p95: ' + $s.traffic.p95Ms + 'ms)'); foreach ($p in $s.pool.providers) { Write-Host ('  Provider:  ' + $p.name + ' -> ' + $p.upstream + ' (' + $p.models + ' models, ' + $p.keys + ' keys, $' + $p.remainingUsd + ' left)') } }"
 exit /b 0
 
+:register
+powershell -NoProfile -ExecutionPolicy Bypass -File "%TABIPOOL_DIR%\register-agents.ps1"
+exit /b %errorlevel%
+
 :uninstall
 if /i "%~2"=="--purge" (
   powershell -NoProfile -ExecutionPolicy Bypass -File "%TABIPOOL_DIR%\uninstall.ps1" -Purge
@@ -113,6 +118,7 @@ echo tabipool - key-rotating LLM proxy pool
 echo.
 echo Usage:
 echo   tabipool web                 Open dashboard in default browser (starts service if stopped)
+echo   tabipool register            Auto-add proxy to detected agents (opencode, Prime, Continue)
 echo   tabipool status              Print /_health and /_stats summary
 echo   tabipool start               Start background service (admin)
 echo   tabipool stop                Stop background service (admin)

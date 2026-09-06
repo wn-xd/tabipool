@@ -25,6 +25,7 @@ This will automatically:
 The `tabipool` CLI is available globally from any command prompt or PowerShell:
 
 - `tabipool web` — Open the dashboard in your default browser (starts the background service if not answering).
+- `tabipool register` — Auto-add proxy as a custom OpenAI-compatible provider to detected agents (opencode, Prime Agent, Continue).
 - `tabipool status` — View proxy health, active pool balances, uptime, and traffic statistics.
 - `tabipool update` — Pull the latest repository changes, update dependencies if lockfile changed, and restart the service (prompts for admin elevation via UAC).
 - `tabipool start` / `tabipool stop` / `tabipool restart` — Control the background service (prompts for admin elevation via UAC).

@@ -141,7 +141,18 @@ Write-Host "Installing and starting Windows service (UAC prompt will appear)..."
 $installServiceScript = Join-Path $installDir "install-service.ps1"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installServiceScript
 
-# 9. Next steps
+# 9. Register agents (best-effort)
+Write-Host "Detecting agents and registering tabipool provider..." -ForegroundColor Cyan
+$registerScript = Join-Path $installDir "register-agents.ps1"
+if (Test-Path $registerScript) {
+  try {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $registerScript
+  } catch {
+    Write-Host "Agent registration skipped: $_" -ForegroundColor Yellow
+  }
+}
+
+# 10. Next steps
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "  tabipool installation complete!" -ForegroundColor Green
@@ -151,6 +162,7 @@ Write-Host "  CLI:         tabipool" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  tabipool web       - Open dashboard in browser"
+Write-Host "  tabipool register  - Re-run agent auto-registration"
 Write-Host "  tabipool status    - Check proxy status and health"
 Write-Host "  tabipool update    - Pull updates and restart service"
 Write-Host "=========================================" -ForegroundColor Green

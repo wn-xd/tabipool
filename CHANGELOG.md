@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+- Agent auto-registration (`tabipool register` + `register-agents.ps1`): automatically detect and configure opencode, Prime Agent, and Continue with live models fetched from `/v1/models`.
+- Manual configuration snippets: printed instructions for Aider, Cline, omp, and generic OpenAI-compatible clients.
+- Automated registration in `install.ps1`: detect installed agents and register the proxy endpoint post-service installation.
+- Dashboard Endpoint card: copyable base URL, API key (`tabipool-local`), live model list with individual copy buttons, and "copy all as JSON".
+
 ## 1.0.3
 - Zero-friction local operation: removed client-facing proxy token across all endpoints and UI.
 - Simplified configuration and installation: loopback-only binding with no client authentication needed.

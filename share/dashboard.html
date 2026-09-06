@@ -123,6 +123,38 @@
       <div class="grid" id="cards"></div>
 
       <section>
+        <h2>Endpoint</h2>
+        <div class="card" id="endpoint-card">
+          <div style="display:grid;gap:12px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span class="label" style="width:72px;margin:0">Base URL</span>
+              <code id="ep-baseurl" style="background:var(--panel2);padding:5px 9px;border-radius:6px;border:1px solid var(--line);font-size:12px;color:var(--tx);flex:1;min-width:220px">http://127.0.0.1:8787/v1</code>
+              <button id="ep-copy-url">copy</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span class="label" style="width:72px;margin:0">API Key</span>
+              <code id="ep-apikey" style="background:var(--panel2);padding:5px 9px;border-radius:6px;border:1px solid var(--line);font-size:12px;color:var(--tx);flex:1;min-width:220px">tabipool-local</code>
+              <button id="ep-copy-key">copy</button>
+              <span class="note" style="margin:0">any value works, auth is disabled</span>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                <span class="label" style="margin:0">Models (<span id="ep-model-count">0</span>)</span>
+                <button id="ep-copy-json">copy all as JSON</button>
+              </div>
+              <div id="ep-models-list" style="display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto;padding:2px 0">
+                <div class="empty" style="padding:8px 0;width:100%">discovering models…</div>
+              </div>
+            </div>
+            <div class="note" style="border-top:1px solid var(--line);padding-top:8px;margin:0">
+              Run <code>tabipool register</code> to auto-add this endpoint to opencode, Prime Agent, and Continue.
+              (omp uses compile-time providers &mdash; configure manually using the endpoint above.)
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
         <h2>Upstream history</h2>
         <div class="card"><div id="archives"></div></div>
       </section>
@@ -522,6 +554,102 @@
           `</tbody></table>`;
       }
 
+      function copyText(text, btn) {
+        const done = () => {
+          if (btn) {
+            const orig = btn.textContent;
+            btn.textContent = "copied!";
+            setTimeout(() => { btn.textContent = orig; }, 1500);
+          }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(() => {
+            fallbackCopy(text, done);
+          });
+        } else {
+          fallbackCopy(text, done);
+        }
+      }
+
+      function fallbackCopy(text, cb) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); if (cb) cb(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+
+      /** Render Endpoint card with live base URL, API key, and model IDs with copy buttons. */
+      async function updateEndpoint(s) {
+        const epUrl = $("ep-baseurl");
+        const epKey = $("ep-apikey");
+        const epCount = $("ep-model-count");
+        const epList = $("ep-models-list");
+        const epCopyUrl = $("ep-copy-url");
+        const epCopyKey = $("ep-copy-key");
+        const epCopyJson = $("ep-copy-json");
+
+        const baseUrl = (location.origin ? location.origin.replace(/\/+$/, "") + "/v1" : "http://127.0.0.1:8787/v1");
+        if (epUrl) epUrl.textContent = baseUrl;
+        if (epKey) epKey.textContent = "tabipool-local";
+        if (epCopyUrl) epCopyUrl.onclick = (e) => copyText(baseUrl, e.target);
+        if (epCopyKey) epCopyKey.onclick = (e) => copyText("tabipool-local", e.target);
+
+        let modelIds = [];
+        try {
+          const r = await fetch("/v1/models");
+          if (r.ok) {
+            const d = await r.json();
+            if (d && Array.isArray(d.data)) {
+              modelIds = d.data.map((m) => m.id).filter(Boolean);
+            }
+          }
+        } catch (e) {}
+
+        if (!modelIds.length && s && s.pool && s.pool.providers) {
+          const set = new Set();
+          for (const prov of s.pool.providers) {
+            for (const m of (prov.modelList || [])) set.add(m);
+          }
+          modelIds = Array.from(set);
+        }
+
+        if (epCount) epCount.textContent = num(modelIds.length);
+
+        if (epCopyJson) {
+          epCopyJson.onclick = (e) => {
+            const block = {
+              baseURL: baseUrl,
+              apiKey: "tabipool-local",
+              models: modelIds,
+            };
+            copyText(JSON.stringify(block, null, 2), e.target);
+          };
+        }
+
+        if (epList) {
+          if (!modelIds.length) {
+            epList.innerHTML = '<div class="empty" style="padding:8px 0;width:100%">no models discovered yet — declare models or add keys</div>';
+          } else {
+            epList.innerHTML = modelIds
+              .map(
+                (m) =>
+                  `<div style="display:inline-flex;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;gap:6px">` +
+                  `<code style="color:var(--tx);font-size:11.5px">${esc(m)}</code>` +
+                  `<button class="ep-copy-m" data-m="${esc(m)}" style="padding:1px 6px;font-size:10.5px">copy</button>` +
+                  `</div>`,
+              )
+              .join("");
+            epList.querySelectorAll(".ep-copy-m").forEach((btn) => {
+              btn.onclick = (e) => copyText(btn.dataset.m, e.target);
+            });
+          }
+        }
+      }
+
       async function load() {
         try {
           const res = await fetch(`/_stats?window=${windowMs}`);
@@ -546,6 +674,7 @@
           }
 
           cards(s);
+          await updateEndpoint(s);
           lineChart($("chart-spend"), s.spendHistory.map((d) => ({ x: d.t, y: d.spentUsd })), {
             color: "#58a6ff",
             fmt: (v) => "$" + v.toFixed(0),
