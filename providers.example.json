@@ -1,0 +1,6 @@
+{
+  "_comment": "Multi-provider routing. Copy to providers.json (gitignored) and list your own providers. Each has its own upstream and key file (keys*.txt, gitignored). Provider names are not secret but this is per-person config, kept out of the update path.",
+  "providers": [
+    { "name": "example", "upstream": "https://api.example.com", "keysFile": "keys.txt", "enabled": true }
+  ]
+}

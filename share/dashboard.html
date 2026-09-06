@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tabitoken pool</title>
+    <style>
+      :root {
+        --bg: #0b0d10;
+        --panel: #14171c;
+        --panel2: #191d24;
+        --line: #242a33;
+        --tx: #e6e9ef;
+        --dim: #8b95a5;
+        --ok: #3fb950;
+        --warn: #d29922;
+        --bad: #f85149;
+        --accent: #58a6ff;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--tx);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        position: sticky;
+        top: 0;
+        background: rgba(11, 13, 16, 0.94);
+        backdrop-filter: blur(8px);
+        z-index: 5;
+      }
+      h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: 0.02em; }
+      .sub { color: var(--dim); font-size: 12px; font-family: var(--mono); }
+      .grow { flex: 1; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+      main { padding: 22px; max-width: 1500px; margin: 0 auto; }
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 15px 17px;
+      }
+      .label {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--dim);
+        margin-bottom: 7px;
+        font-weight: 600;
+      }
+      .big { font-size: 27px; font-weight: 650; font-family: var(--mono); letter-spacing: -0.02em; }
+      .note { font-size: 11.5px; color: var(--dim); margin-top: 5px; font-family: var(--mono); }
+      section { margin-top: 22px; }
+      h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); margin: 0 0 11px; }
+      .bar { height: 6px; border-radius: 3px; background: var(--panel2); overflow: hidden; margin-top: 9px; }
+      .bar > i { display: block; height: 100%; }
+      table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+      th {
+        text-align: right;
+        font-weight: 600;
+        color: var(--dim);
+        padding: 7px 9px;
+        border-bottom: 1px solid var(--line);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+      }
+      th:first-child, td:first-child { text-align: left; }
+      td { padding: 6px 9px; border-bottom: 1px solid rgba(36, 42, 51, 0.5); text-align: right; white-space: nowrap; }
+      tbody tr:hover { background: var(--panel2); }
+      .pill { padding: 1.5px 7px; border-radius: 20px; font-size: 10.5px; font-weight: 600; }
+      .p-ok { background: rgba(63, 185, 80, 0.14); color: var(--ok); }
+      .p-cool { background: rgba(210, 153, 34, 0.14); color: var(--warn); }
+      .p-dead { background: rgba(248, 81, 73, 0.14); color: var(--bad); }
+      .mut { color: var(--dim); }
+      button {
+        background: var(--panel2);
+        color: var(--tx);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 5px 11px;
+        font-size: 12px;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      button:hover { border-color: var(--accent); }
+      button[aria-pressed="true"] { background: var(--accent); color: #04121f; border-color: var(--accent); font-weight: 600; }
+      .charts { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+      @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+      svg { display: block; width: 100%; overflow: visible; }
+      .scroll { max-height: 420px; overflow: auto; }
+      .empty { color: var(--dim); padding: 26px 0; text-align: center; font-family: var(--mono); font-size: 12px; }
+      code { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>tabitoken pool</h1>
+      <span class="sub" id="hdr">connecting…</span>
+      <span class="grow"></span>
+      <span class="sub" id="win-label"></span>
+      <button data-w="3600000">1h</button>
+      <button data-w="86400000" aria-pressed="true">24h</button>
+      <button data-w="604800000">7d</button>
+      <button data-w="2592000000">30d</button>
+      <button id="refresh">refresh</button>
+    </header>
+
+    <main>
+      <div class="grid" id="cards"></div>
+
+      <section>
+        <h2>Upstream history</h2>
+        <div class="card"><div id="archives"></div></div>
+      </section>
+
+      <section>
+        <h2>Spend &amp; activity</h2>
+        <div class="charts">
+          <div class="card">
+            <div class="label">Cumulative spend (USD)</div>
+            <div id="chart-spend"></div>
+          </div>
+          <div class="card">
+            <div class="label">Requests per bucket</div>
+            <div id="chart-traffic"></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Wallet drain per key</h2>
+        <div class="card"><div id="chart-keys"></div></div>
+      </section>
+
+      <section>
+        <h2>Keys</h2>
+        <div class="card" style="margin-bottom:14px">
+          <div class="label">Add API keys</div>
+          <div class="note" style="margin:0 0 9px">
+            One <code>sk-</code> key per line. Each is validated against the gateway before it joins the
+            pool, then appended to <code>keys.txt</code>. Requires the proxy token.
+          </div>
+          <textarea id="newkeys" rows="3" placeholder="sk-..." spellcheck="false"
+            style="width:100%;background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:9px;font-family:var(--mono);font-size:12px;resize:vertical"></textarea>
+          <div style="display:flex;gap:9px;align-items:center;margin-top:9px;flex-wrap:wrap">
+            <input id="tok" type="password" placeholder="proxy token" autocomplete="off"
+              style="background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px;width:190px" />
+            <button id="addbtn">add keys</button>
+            <span class="note" id="addmsg" style="margin:0"></span>
+          </div>
+        </div>
+        <div class="card scroll"><div id="keys"></div></div>
+      </section>
+
+      <section>
+        <div class="charts">
+          <div class="card">
+            <h2>By model</h2>
+            <div id="models"></div>
+          </div>
+          <div class="card">
+            <h2>Outcomes</h2>
+            <div id="actions"></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Recent requests</h2>
+        <div class="card scroll"><div id="recent"></div></div>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let windowMs = 86400000;
+      let timer = null;
+
+      const usd = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const num = (n) => Number(n).toLocaleString("en-US");
+      const ms = (n) => (n >= 1000 ? (n / 1000).toFixed(2) + "s" : Math.round(n) + "ms");
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+      function dur(msv) {
+        const s = Math.floor(msv / 1000);
+        if (s < 60) return s + "s";
+        const m = Math.floor(s / 60);
+        if (m < 60) return m + "m";
+        const h = Math.floor(m / 60);
+        if (h < 24) return h + "h " + (m % 60) + "m";
+        return Math.floor(h / 24) + "d " + (h % 24) + "h";
+      }
+
+      function clock(t) {
+        const d = new Date(t);
+        return d.toLocaleTimeString("en-US", { hour12: false });
+      }
+
+      /** Minimal SVG line chart. Avoids a charting dependency for two series. */
+      function lineChart(el, pts, { height = 170, color = "#58a6ff", fmt = (v) => v } = {}) {
+        if (!pts.length) {
+          el.innerHTML = '<div class="empty">no data in window</div>';
+          return;
+        }
+        const W = 1000, H = height, pad = { l: 52, r: 10, t: 12, b: 24 };
+        const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs);
+        let y0 = Math.min(...ys), y1 = Math.max(...ys);
+        if (y0 === y1) { y0 = y0 - 1; y1 = y1 + 1; }
+        y0 = Math.min(y0, y1 * 0.995);
+        const sx = (v) => pad.l + ((v - x0) / (x1 - x0 || 1)) * (W - pad.l - pad.r);
+        const sy = (v) => H - pad.b - ((v - y0) / (y1 - y0 || 1)) * (H - pad.t - pad.b);
+        const d = pts.map((p, i) => (i ? "L" : "M") + sx(p.x).toFixed(1) + " " + sy(p.y).toFixed(1)).join(" ");
+        const area = d + ` L ${sx(x1).toFixed(1)} ${H - pad.b} L ${sx(x0).toFixed(1)} ${H - pad.b} Z`;
+        const ticks = [y0, (y0 + y1) / 2, y1]
+          .map((v) => `<g><line x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v).toFixed(1)}" y2="${sy(v).toFixed(1)}" stroke="#242a33"/><text x="${pad.l - 8}" y="${(sy(v) + 4).toFixed(1)}" fill="#8b95a5" font-size="11" text-anchor="end" font-family="ui-monospace,monospace">${fmt(v)}</text></g>`)
+          .join("");
+        const lbl = [pts[0], pts[pts.length - 1]]
+          .map((p, i) => `<text x="${sx(p.x).toFixed(1)}" y="${H - 6}" fill="#8b95a5" font-size="11" text-anchor="${i ? "end" : "start"}" font-family="ui-monospace,monospace">${clock(p.x)}</text>`)
+          .join("");
+        el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px">
+          <defs><linearGradient id="g${color.slice(1)}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+          </linearGradient></defs>
+          ${ticks}<path d="${area}" fill="url(#g${color.slice(1)})"/>
+          <path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>${lbl}</svg>`;
+      }
+
+      /** Stacked ok/failed bars per time bucket. */
+      function barChart(el, rows, { height = 170 } = {}) {
+        if (!rows.length) {
+          el.innerHTML = '<div class="empty">no requests in window</div>';
+          return;
+        }
+        const W = 1000, H = height, pad = { l: 52, r: 10, t: 12, b: 24 };
+        const max = Math.max(...rows.map((r) => r.ok + r.failed), 1);
+        const bw = (W - pad.l - pad.r) / rows.length;
+        const h = (v) => (v / max) * (H - pad.t - pad.b);
+        const bars = rows
+          .map((r, i) => {
+            const x = pad.l + i * bw + bw * 0.15, w = Math.max(1, bw * 0.7);
+            const ho = h(r.ok), hf = h(r.failed);
+            const yo = H - pad.b - ho, yf = yo - hf;
+            return (
+              `<rect x="${x.toFixed(1)}" y="${yo.toFixed(1)}" width="${w.toFixed(1)}" height="${ho.toFixed(1)}" fill="#3fb950" rx="1"><title>${clock(r.t)} ok=${r.ok} avg=${ms(r.avgMs)} blips=${r.blips}</title></rect>` +
+              (r.failed ? `<rect x="${x.toFixed(1)}" y="${yf.toFixed(1)}" width="${w.toFixed(1)}" height="${hf.toFixed(1)}" fill="#f85149" rx="1"><title>${clock(r.t)} failed=${r.failed}</title></rect>` : "")
+            );
+          })
+          .join("");
+        const ticks = [0, max / 2, max]
+          .map((v) => {
+            const y = H - pad.b - h(v);
+            return `<g><line x1="${pad.l}" x2="${W - pad.r}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#242a33"/><text x="${pad.l - 8}" y="${(y + 4).toFixed(1)}" fill="#8b95a5" font-size="11" text-anchor="end" font-family="ui-monospace,monospace">${Math.round(v)}</text></g>`;
+          })
+          .join("");
+        el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px">${ticks}${bars}
+          <text x="${pad.l}" y="${H - 6}" fill="#8b95a5" font-size="11" font-family="ui-monospace,monospace">${clock(rows[0].t)}</text>
+          <text x="${W - pad.r}" y="${H - 6}" fill="#8b95a5" font-size="11" text-anchor="end" font-family="ui-monospace,monospace">${clock(rows[rows.length - 1].t)}</text></svg>`;
+      }
+
+      /** Horizontal per-key drain bars, colored by how much wallet is gone. */
+      function keyBars(el, keys) {
+        const sorted = [...keys].sort((a, b) => b.usedPct - a.usedPct);
+        const rowH = 19, H = sorted.length * rowH + 8, W = 1000, labelW = 78, valW = 150;
+        const body = sorted
+          .map((k, i) => {
+            const y = i * rowH + 4;
+            const w = Math.max(1, (k.usedPct / 100) * (W - labelW - valW));
+            const c = k.usedPct > 85 ? "#f85149" : k.usedPct > 60 ? "#d29922" : "#3fb950";
+            return `<g><text x="0" y="${y + 12}" fill="#8b95a5" font-size="11" font-family="ui-monospace,monospace">${esc(k.tail)}</text>
+              <rect x="${labelW}" y="${y + 3}" width="${W - labelW - valW}" height="9" fill="#191d24" rx="4"/>
+              <rect x="${labelW}" y="${y + 3}" width="${w.toFixed(1)}" height="9" fill="${c}" rx="4"><title>${esc(k.tail)} ${k.usedPct}% used${k.creditStale ? " (credit baseline stale)" : ", " + usd(k.remainingUsd) + " left"}</title></rect>
+              <text x="${W - valW + 10}" y="${y + 12}" fill="#e6e9ef" font-size="11" font-family="ui-monospace,monospace">${k.usedPct}%</text>
+              <text x="${W}" y="${y + 12}" fill="#8b95a5" font-size="11" text-anchor="end" font-family="ui-monospace,monospace">${k.creditStale ? "baseline stale" : usd(k.remainingUsd) + " left"}</text></g>`;
+          })
+          .join("");
+        el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="height:${H}px">${body}</svg>`;
+      }
+
+      function cards(s) {
+        const m = s.money, t = s.traffic, p = s.pool;
+        const burnPct = m.usedPct;
+        const items = [
+          {
+            label: "Remaining credit",
+            big: usd(m.remainingUsd),
+            note:
+              `of ${usd(m.initialUsd)} · ${burnPct}% spent` +
+              (m.staleCreditKeys ? ` · ⚠ ${m.staleCreditKeys} key${m.staleCreditKeys > 1 ? "s" : ""} over recorded credit` : ""),
+            bar: [burnPct, burnPct > 85 ? "var(--bad)" : burnPct > 60 ? "var(--warn)" : "var(--ok)"],
+          },
+          {
+            label: "Spent",
+            big: usd(m.spentUsd),
+            note: m.estRequestsLeft !== null ? `~${num(m.estRequestsLeft)} requests left @ ${usd(m.estCostPerRequestUsd)}` : "no completed requests yet",
+          },
+          {
+            label: "Requests in window",
+            big: num(t.requests),
+            note: `${num(t.ok)} ok · ${num(t.failed)} failed · ${num(t.streamed)} streamed`,
+          },
+          {
+            label: "Success rate",
+            big: t.successPct + "%",
+            note: `${num(t.retriedButSucceeded)} saved by retry · ${num(t.blipsAbsorbed)} blips absorbed`,
+            bar: [t.successPct, t.successPct > 98 ? "var(--ok)" : t.successPct > 90 ? "var(--warn)" : "var(--bad)"],
+          },
+          {
+            label: "Latency p50 / p95",
+            big: ms(t.p50Ms),
+            note: `p95 ${ms(t.p95Ms)} · p99 ${ms(t.p99Ms)}`,
+          },
+          {
+            label: "Pool health",
+            big: `${p.live}/${p.total}`,
+            note: p.ipPaused ? `IP THROTTLED — ${p.ipPaused}s` : "keys ready",
+            bar: [(p.live / Math.max(1, p.total)) * 100, p.live === p.total ? "var(--ok)" : "var(--warn)"],
+          },
+        ];
+        $("cards").innerHTML = items
+          .map(
+            (i) =>
+              `<div class="card"><div class="label">${i.label}</div><div class="big">${i.big}</div>` +
+              (i.bar ? `<div class="bar"><i style="width:${Math.min(100, i.bar[0]).toFixed(1)}%;background:${i.bar[1]}"></i></div>` : "") +
+              `<div class="note">${i.note}</div></div>`,
+          )
+          .join("");
+      }
+
+      function keyTable(keys) {
+        const sorted = [...keys].sort((a, b) => b.spentUsd - a.spentUsd);
+        $("keys").innerHTML =
+          `<table><thead><tr><th>Key</th><th>State</th><th>Spent</th><th>Remaining</th><th>Used</th><th>Reqs</th><th>Blips</th><th>Fails</th><th>Last error</th></tr></thead><tbody>` +
+          sorted
+            .map((k) => {
+              const cls = k.state === "dead" ? "p-dead" : k.state.startsWith("cool") ? "p-cool" : "p-ok";
+              return `<tr><td>${esc(k.tail)}</td><td><span class="pill ${cls}">${esc(k.state)}</span></td>
+                <td>${usd(k.spentUsd)}</td><td>${k.creditStale ? '<span class="mut" title="upstream spend exceeds the credit recorded in usage-by-key.csv">unknown</span>' : usd(k.remainingUsd)}</td><td>${k.usedPct}%</td>
+                <td>${num(k.requests)}</td><td>${k.blips ? num(k.blips) : '<span class="mut">0</span>'}</td>
+                <td>${k.failures ? '<span style="color:var(--bad)">' + num(k.failures) + "</span>" : '<span class="mut">0</span>'}</td>
+                <td class="mut">${k.lastError ? esc(k.lastError).slice(0, 46) : "—"}</td></tr>`;
+            })
+            .join("") +
+          `</tbody></table>`;
+      }
+
+      function kvTable(el, obj, cols) {
+        const rows = Object.entries(obj);
+        if (!rows.length) {
+          el.innerHTML = '<div class="empty">no data in window</div>';
+          return;
+        }
+        el.innerHTML =
+          `<table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>` +
+          rows
+            .sort((a, b) => (b[1].requests ?? b[1]) - (a[1].requests ?? a[1]))
+            .map(([k, v]) =>
+              typeof v === "object"
+                ? `<tr><td>${esc(k)}</td><td>${num(v.requests)}</td><td>${v.failures ? '<span style="color:var(--bad)">' + num(v.failures) + "</span>" : '<span class="mut">0</span>'}</td><td>${ms(v.avgMs)}</td></tr>`
+                : `<tr><td>${esc(k)}</td><td>${num(v)}</td></tr>`,
+            )
+            .join("") +
+          `</tbody></table>`;
+      }
+
+      /** Per-upstream spend, so history survives switching gateways. */
+      function archiveTable(s) {
+        const rows = [
+          {
+            label: (s.pool.upstream || "").replace(/^https?:\/\//, ""),
+            keys: s.pool.keys.length,
+            spentUsd: s.money.spentUsd,
+            savedAt: s.generatedAt,
+            active: true,
+          },
+          ...(s.archives || []).filter((a) => !a.active),
+        ];
+        const lifetime = s.lifetimeSpentUsd ?? s.money.spentUsd;
+        $("archives").innerHTML =
+          `<table><thead><tr><th>Upstream</th><th>State</th><th>Keys</th><th>Spent</th><th>Last seen</th></tr></thead><tbody>` +
+          rows
+            .map(
+              (r) =>
+                `<tr><td>${esc(r.label)}</td>` +
+                `<td><span class="pill ${r.active ? "p-ok" : "p-cool"}">${r.active ? "active" : "archived"}</span></td>` +
+                `<td>${num(r.keys)}</td><td>${usd(r.spentUsd)}</td>` +
+                `<td class="mut">${r.savedAt ? new Date(r.savedAt).toLocaleString("en-US", { hour12: false }) : "—"}</td></tr>`,
+            )
+            .join("") +
+          `</tbody></table>` +
+          `<div class="note" style="margin-top:9px">lifetime across all upstreams: <strong>${usd(lifetime)}</strong>` +
+          ` · archived rows are read-only snapshots kept when the gateway changed</div>`;
+      }
+
+      function recentTable(rows) {
+        if (!rows.length) {
+          $("recent").innerHTML = '<div class="empty">no requests recorded yet — send one through the proxy</div>';
+          return;
+        }
+        $("recent").innerHTML =
+          `<table><thead><tr><th>Time</th><th>Key</th><th>Model</th><th>Path</th><th>Status</th><th>Took</th><th>Tries</th><th>Blips</th><th>Outcome</th></tr></thead><tbody>` +
+          rows
+            .map((r) => {
+              const good = r.status >= 200 && r.status < 300;
+              return `<tr><td>${clock(r.t)}</td><td>${esc(r.key)}</td><td>${esc(r.model)}</td>
+                <td class="mut">${esc(r.path)}</td>
+                <td style="color:${good ? "var(--ok)" : "var(--bad)"}">${r.status}</td>
+                <td>${ms(r.ms)}</td><td>${r.attempts}</td>
+                <td>${r.blips ? '<span style="color:var(--warn)">' + r.blips + "</span>" : '<span class="mut">0</span>'}</td>
+                <td class="mut">${esc(r.action)}</td></tr>`;
+            })
+            .join("") +
+          `</tbody></table>`;
+      }
+
+      async function load() {
+        try {
+          const res = await fetch(`/_stats?window=${windowMs}`);
+          if (!res.ok) throw new Error("stats " + res.status);
+          const s = await res.json();
+
+          const p = s.pool;
+          const colour = p.ipPaused ? "var(--bad)" : p.live === p.total ? "var(--ok)" : "var(--warn)";
+          $("hdr").innerHTML = `<span class="dot" style="background:${colour}"></span>${esc(p.upstream)} · ${p.live}/${p.total} keys · up ${dur(s.uptimeMs)}`;
+          $("win-label").textContent = new Date(s.generatedAt).toLocaleTimeString("en-US", { hour12: false });
+
+          cards(s);
+          lineChart($("chart-spend"), s.spendHistory.map((d) => ({ x: d.t, y: d.spentUsd })), {
+            color: "#58a6ff",
+            fmt: (v) => "$" + v.toFixed(0),
+          });
+          barChart($("chart-traffic"), s.timeline);
+          keyBars($("chart-keys"), p.keys);
+          keyTable(p.keys);
+          kvTable($("models"), s.byModel, ["Model", "Reqs", "Fails", "Avg"]);
+          kvTable($("actions"), s.byAction, ["Outcome", "Count"]);
+          recentTable(s.recent);
+          archiveTable(s);
+        } catch (e) {
+          $("hdr").innerHTML = `<span class="dot" style="background:var(--bad)"></span>${esc(e.message)}`;
+        }
+      }
+
+      document.querySelectorAll("button[data-w]").forEach((b) =>
+        b.addEventListener("click", () => {
+          windowMs = Number(b.dataset.w);
+          document.querySelectorAll("button[data-w]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+          load();
+        }),
+      );
+      $("refresh").addEventListener("click", load);
+
+      // Token is kept in sessionStorage only: convenience across refreshes without
+      // persisting a spending credential to disk.
+      $("tok").value = sessionStorage.getItem("proxyToken") || "";
+      $("tok").addEventListener("change", () => sessionStorage.setItem("proxyToken", $("tok").value));
+
+      $("addbtn").addEventListener("click", async () => {
+        const raw = $("newkeys").value.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+        const token = $("tok").value.trim();
+        const msg = $("addmsg");
+        if (!raw.length) { msg.textContent = "paste at least one key"; return; }
+        if (!token) { msg.textContent = "proxy token required"; return; }
+        sessionStorage.setItem("proxyToken", token);
+        $("addbtn").disabled = true;
+        msg.textContent = `validating ${raw.length} key(s) against the gateway…`;
+        try {
+          const r = await fetch("/_keys/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+            body: JSON.stringify({ keys: raw }),
+          });
+          const j = await r.json();
+          if (!r.ok) {
+            msg.innerHTML = `<span style="color:var(--bad)">${esc(j.error?.message || r.status)}</span>`;
+          } else {
+            const parts = [];
+            if (j.added.length) parts.push(`<span style="color:var(--ok)">added ${j.added.length}</span>`);
+            for (const x of j.rejected || []) parts.push(`<span style="color:var(--bad)">${esc(x.tail)} ${esc(x.reason)}</span>`);
+            msg.innerHTML = (parts.join(" · ") || "nothing to do") + ` · pool now ${j.poolSize}`;
+            if (j.added.length) $("newkeys").value = "";
+            load();
+          }
+        } catch (e) {
+          msg.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+        } finally {
+          $("addbtn").disabled = false;
+        }
+      });
+
+      load();
+      timer = setInterval(load, 5000);
+    </script>
+  </body>
+</html>

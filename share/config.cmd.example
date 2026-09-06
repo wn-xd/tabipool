@@ -1,0 +1,27 @@
+@echo off
+rem ============================================================
+rem  Copy this file to  config.cmd  and edit the values below.
+rem  config.cmd holds your secrets and is gitignored.
+rem ============================================================
+
+rem --- REQUIRED: a password of your choosing that clients must send. ---
+rem The proxy attaches your real API keys for you, so anything that can reach
+rem this port can spend your credit. Pick something non-obvious.
+set PROXY_TOKEN=change-me-to-something-random
+
+rem --- REQUIRED: which gateway to route to. ---
+rem Any new-api / one-api style OpenAI-compatible gateway works.
+set UPSTREAM=https://api.example.com
+
+rem --- Ports. UI_PORT gives the friendly http://tabi.local/ URL; 0 disables it. ---
+set PORT=8787
+set UI_PORT=80
+
+rem --- Loopback only. Do NOT set 0.0.0.0 unless you intend to expose ---
+rem --- a credit-spending endpoint to your whole network. ---
+set HOST=127.0.0.1
+
+rem --- Files. keys.txt is one sk-... key per line. ---
+set KEYS_FILE=keys.txt
+set STATE_FILE=state.json
+set LOG_FILE=requests.jsonl

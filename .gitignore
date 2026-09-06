@@ -1,0 +1,31 @@
+# Live API credentials - never commit. Pattern covers every provider's key file,
+# so adding a provider cannot leak keys by being missed here.
+keys.txt
+keys-*.txt
+usage-by-key.csv
+credits.json
+
+# Runtime state (spend counters, key health)
+state.json
+state-*.json
+requests.jsonl
+*.jsonl
+proxy.log
+service.log
+service-*.log
+
+# Local env
+.env
+.env.*
+
+# Probe scripts
+probe/
+
+node_modules/
+tabipool.cmd
+_retired-wrappers/
+share.zip
+
+# Per-person config - never in the update path
+config.local.ps1
+providers.json

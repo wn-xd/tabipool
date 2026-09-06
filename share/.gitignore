@@ -1,0 +1,14 @@
+# Secrets — never commit
+config.cmd
+keys.txt
+keys-*.txt
+.env
+.env.*
+
+# Runtime state
+state.json
+state-*.json
+requests.jsonl
+proxy.log
+
+node_modules/
